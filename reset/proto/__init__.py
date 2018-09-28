@@ -2,6 +2,18 @@ import curio
 import google.protobuf.json_format
 
 
+async def recv_len(socket, length):
+	buf_back = bytearray(length)
+	buf = memoryview(buf_back)
+	have = 0
+	while have < length:
+		got = await socket.recv_into(buf[have:], length - have)
+		if got == 0:
+			raise ConnectionResetError("Client Disconnected")
+		have += got
+	return buf_back
+
+
 class Protocol:
 	def __init__(self):
 		self._handlers = {f.command_type: getattr(self, n) for n, f in self.__class__.__dict__.items() if hasattr(f, 'command_type')}
@@ -30,15 +42,3 @@ class Protocol:
 			f.command_type = command_type
 			return f
 		return wrapper
-
-
-async def recv_len(socket, length):
-	buf_back = bytearray(length)
-	buf = memoryview(buf_back)
-	have = 0
-	while have < length:
-		got = await socket.recv_into(buf[have:], length - have)
-		if got == 0:
-			raise ConnectionResetError("Client Disconnected")
-		have += got
-	return buf_back

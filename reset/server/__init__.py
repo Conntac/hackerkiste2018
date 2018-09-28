@@ -5,109 +5,62 @@ import traceback
 import curio
 from curio import socket
 
-from ..proto import commands_pb2 as commands, events_pb2 as events, types_pb2 as types, Protocol, recv_len
+from ..proto import commands_pb2 as commands, events_pb2 as events, types_pb2 as types, Protocol
 from .. import util
 from . import game
 
 
 class Client:
-	def __init__(self, server, socket, addr):
-		self._server = server
-		self._socket = socket
-		self._addr = addr
+	def __init__(self):
 		self.player = None
 		self._task_group = curio.TaskGroup()
 
 	async def close(self):
-		self._socket.shutdown(socket.SHUT_RDWR)
-		self._socket.close()
-		await self._task_group.cancel_remaining()
+		raise NotImplementedError()
 
 	async def send(self, packet):
-		#print(self, "<", packet)
-		await self._socket.sendall(len(packet).to_bytes(4, 'big'))
-		await self._socket.sendall(packet)
+		raise NotImplementedError()
 
-	async def recv(self):
-		packet_length = int.from_bytes(await recv_len(self._socket, 4), 'big')
-		packet = await recv_len(self._socket, packet_length)
-		#print(self, ">", packet)
-		return packet
-
-	async def watch_player(self, server, player):
+	async def watch_player(self, player):
 		for resource_type, resource_value in player.resources.items():
 			async def watcher(resource_type, resource_value):
 				while True:
 					await resource_value.wait()
-					await server.send(self, events.EventPlayerResource(resource_type_id=resource_type.id, amount=resource_value.value))
+					await self.send(events.EventPlayerResource(resource_type_id=resource_type.id, amount=resource_value.value))
 			await self._task_group.spawn(watcher(resource_type, resource_value))
-
-	def __str__(self):
-		return f"Client{{{self._addr[0]}:{self._addr[1]}}}"
 
 
 class Server:
-	def __init__(self, host, port):
-		self.host = host
-		self.port = port
-		self.protocol = None
+	def __init__(self, protocol):
+		self.protocol = protocol
 		self.clients = set()
-		self.queue = curio.Queue()
 		self._protocol_task = None
+
+	async def add_client(self, client):
+		self.clients.add(client)
+
+	async def remove_client(self, client):
+		self.clients.discard(client)
 
 	async def set_protocol(self, protocol):
 		if self._protocol_task is not None:
 			await self._protocol_task.cancel()
 		self.protocol = protocol
-		self._protocol_task = await curio.spawn(protocol.run(self))
-
-	async def network_client(self, sock, addr):
-		''' If this is called, someone just connected! We need to move them through the pases up to the
-		current one, so they can be brought up to date with all the Resource/UnitTypes already defined.'''
-		client = Client(self, sock, addr)
-		self.clients.add(client)
-		await self.protocol.on_connect(self, client)
-
-		try:
-			while True:
-				packet = await client.recv()
-				try:
-					message = commands.ClientToServer()
-					message.ParseFromString(packet)
-					payload = getattr(message, message.WhichOneof("payload"))
-					await self.protocol.handle(self, client, payload)
-				except:
-					traceback.print_exc()
-		except ConnectionResetError:
-			self.clients.discard(client)
-			await self.protocol.on_disconnect(self, client)
+		if self.protocol is not None:
+			self._protocol_task = await curio.spawn(self.protocol.run(self))
+		else:
+			self._protocol_task = None
 
 	async def run(self):
-		async with curio.TaskGroup() as g:
-			await g.spawn(curio.tcp_server(self.host, self.port, self.network_client))
-			await g.spawn(self.queue_handler())
-			print(f"Listening on {self.host}:{self.port}")
+		if self.protocol is not None:
+			self._protocol_task = await curio.spawn(self.protocol.run(self))
 
-	async def queue_handler(self):
-		while True:
-			(recipient, payload) = await self.queue.get()
-			message = events.ServerToClient()
-			for fd in message.DESCRIPTOR.oneofs_by_name["payload"].fields:
-				if payload.DESCRIPTOR == fd.message_type:
-					getattr(message, fd.name).CopyFrom(payload)
-					break
-			packet = message.SerializeToString()
-			if recipient is None:
-				for client in self.clients:
-					await client.send(packet)
-			else:
-				await recipient.send(packet)
-
-	async def send(self, client, message):
-		await self.queue.put((client, message))
+	async def handle(self, client, message):
+		await self.protocol.handle(self, client, message)
 
 	async def broadcast(self, message):
-		await self.queue.put((None, message))
+		for client in self.clients:
+			await client.send(message)
 
 
 class ProtocolPreGame(Protocol):
@@ -124,7 +77,7 @@ class ProtocolPreGame(Protocol):
 		try:
 			return await super(ProtocolPreGame, self).handle(server, client, message)
 		except game.GameError as e:
-			await server.send(client, events.Error(error=e.message))
+			await client.send(events.Error(error=e.message))
 
 	@Protocol.handler(commands.CmdJoin)
 	async def on_command_join(self, server, client, message):
@@ -134,7 +87,7 @@ class ProtocolPreGame(Protocol):
 			await server.broadcast(events.EventPlayerJoin(player_id=client.player.id, name=client.player.name))
 			print(f"Player joined: {client.player.name!r}")
 		else:
-			await server.send(client, events.Error(error="You already joined; I'm ignoring this second CmdJoin."))
+			await client.send(events.Error(error="You already joined; I'm ignoring this second CmdJoin."))
 
 	@Protocol.handler(commands.CmdLeave)
 	async def on_command_leave(self, server, client, message):
@@ -143,7 +96,7 @@ class ProtocolPreGame(Protocol):
 			print(f"Player left: {client.player.name!r}")
 			client.player = None
 		else:
-			await server.send(client, events.Error(error="You haven't joined; I'm ignoring this CmdLeave."))
+			await client.send(events.Error(error="You haven't joined; I'm ignoring this CmdLeave."))
 
 	@Protocol.handler(commands.CmdGameStart)
 	async def on_command_game_start(self, server, client, message):
@@ -152,7 +105,7 @@ class ProtocolPreGame(Protocol):
 		await server.set_protocol(ProtocolGame(self.rules, map))
 		print("Starting game")
 		for player in map.players:
-			await player.client.watch_player(server, player)
+			await player.client.watch_player(player)
 		await server.broadcast(events.EventGameStart())
 
 	async def _send_rules(self, server, rules):
@@ -225,7 +178,7 @@ class ProtocolGame(Protocol):
 		try:
 			return await super(ProtocolGame, self).handle(server, client, message)
 		except game.GameError as e:
-			await server.send(client, events.Error(error=e.message))
+			await client.send(events.Error(error=e.message))
 
 	@Protocol.handler('UNIT_CREATE')
 	async def on_event_unit_create(self, server, client, event):
@@ -250,12 +203,12 @@ class ProtocolGame(Protocol):
 		event = events.EventActionUpdate(action_id=action.id, state=state.value)
 		if msg is not None:
 			event.message = msg
-		await server.send(action.unit.player.client, event)
+		await action.unit.player.client.send(event)
 
 	@Protocol.handler('ACTION_DEQUEUE')
 	async def on_action_dequeue(self, server, client, event):
 		action, = event
-		await server.send(action.unit.player.client, events.EventActionDequeued(action_id=action.id))
+		await action.unit.player.client.send(events.EventActionDequeued(action_id=action.id))
 
 	@Protocol.handler(commands.CmdLeave)
 	async def on_command_leave(self, server, client, message):
@@ -289,7 +242,7 @@ class ProtocolGame(Protocol):
 				raise game.GameError("Target cell does not have the necessary tags")
 
 		action = await self.map.action_queue(action_type, unit, message.mode, target_unit, target_cell)
-		await server.send(client, events.EventActionQueued(action_id=action.id, unit_id=action.unit.id))
+		await client.send(events.EventActionQueued(action_id=action.id, unit_id=action.unit.id))
 
 	@Protocol.handler(commands.CmdActionCancel)
 	async def on_command_action_cancel(self, server, client, message):

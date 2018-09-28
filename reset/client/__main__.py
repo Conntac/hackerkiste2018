@@ -11,17 +11,15 @@ from ..proto import commands_pb2 as commands, events_pb2 as events
 from .. import util
 
 
-NAME="Player"
-
-async def command_join(client, args):
-	await client.send(commands.CmdJoin(name=NAME))
+async def command_join(pargs, client, args):
+	await client.send(commands.CmdJoin(name=pargs.name))
 
 
-async def command_start(client, args):
+async def command_start(pargs, client, args):
 	await client.send(commands.CmdGameStart())
 
 
-async def command_action(client, args):
+async def command_action(pargs, client, args):
 	ap = argparse.ArgumentParser()
 	ap.add_argument("action_type", type=int)
 	ap.add_argument("unit", type=int)
@@ -38,7 +36,7 @@ async def command_action(client, args):
 	await client.send(cmd)
 
 
-async def cli(rules, client):
+async def cli(pargs, rules, client):
 	console = curio.io.FileStream(sys.stdin.buffer)
 	while True:
 		command = await console.readline()
@@ -52,7 +50,7 @@ async def cli(rules, client):
 			print(f"Unknown command: {command}")
 		else:
 			try:
-				await cmd_handler(client, args)
+				await cmd_handler(pargs, client, args)
 			except:
 				traceback.print_exc()
 	
@@ -62,13 +60,14 @@ async def main():
 	ap.add_argument("port", type=int)
 	ap.add_argument("--join", action='store_true', default=False)
 	ap.add_argument("--start", action='store_true', default=False)
+	ap.add_argument("--name", default="Player")
 	args = ap.parse_args()
 
 	rules = Rules()
 	protocol = ProtocolUser(rules)
 	client = Client(args.host, args.port, protocol)
 	async with util.ScopeTask(client.run()):
-		cli_task = await curio.spawn(cli(rules, client))
+		cli_task = await curio.spawn(cli(pargs, rules, client))
 		if args.join:
 			await command_join(client, [])
 		if args.start:

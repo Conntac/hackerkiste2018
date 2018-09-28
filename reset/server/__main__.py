@@ -6,6 +6,8 @@ from . import ProtocolPreGame, Server
 from .rules import *
 from .generator import *
 from .game import Payment
+from .tcp_server import tcp_server
+from .ws_server import ws_server
 
 rules = Rules()
 
@@ -30,8 +32,12 @@ def action_farm(farm_resources):
 		await action.unit.player.give(farm_resources)
 	return execute
 
-async def execute_move_towards(map, action):
-	## TODO: 
+def action_move():
+	pathfinder = Pathfinder()
+	async def execute_move_towards(map, action):
+		pathfinder.update(action.unit, action.target_cell)
+		await curio.sleep(action.action_type.duration)
+		await map.move_unit(action.unit, pathfinder.get_next_cell())
 	pass
 
 
@@ -60,9 +66,10 @@ player_bases.add_hook(hook_player_unit(unit_city))
 
 async def main():
 	protocol = ProtocolPreGame(rules, gen)
-	server = Server('0.0.0.0', 1337)
-	await server.set_protocol(protocol)
+	server = Server(protocol)
 	async with curio.TaskGroup() as g:
+		await g.spawn(tcp_server(server, '0.0.0.0', 1337))
+		await g.spawn(ws_server(server, '0.0.0.0', 8080))
 		await g.spawn(server.run())
 
 
