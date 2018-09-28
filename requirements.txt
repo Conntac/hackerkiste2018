@@ -2,3 +2,4 @@ curio>=0.9
 noise>=1.2
 protobuf>=3.6
 wsproto>=0.12
+HeapDict>=1.0.0
