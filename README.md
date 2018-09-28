@@ -25,3 +25,17 @@ And the client using
 ```
 python -m reset.client
 ```
+
+#### Known issues
+
+If you're on Ubuntu and `make` returns something like 
+```
+protoc -Ireset/proto --python_out=reset/proto reset/proto/types.proto
+make: protoc: Command not found
+Makefile:4: recipe for target 'reset/proto/types_pb2.py' failed
+make: *** [reset/proto/types_pb2.py] Error 127
+```
+
+try installing the following package: 
+
+`sudo apt-get install protobuf-compiler`
