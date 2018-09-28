@@ -1,0 +1,156 @@
+syntax = "proto2";
+
+/* Hier sind Nachrichten definiert, die der Server
+von sich aus an Clients verschickt um über Geschehnisse
+in Spiel zu informieren. */
+
+package reset.proto.events;
+
+import "types.proto";
+
+message ServerToClient {
+	oneof payload {
+		Error error = 01;
+
+		InfoTerrainType info_terrain_type = 10;
+		InfoResourceType info_resource_type = 11;
+		InfoActionType info_action_type = 12;
+		InfoUnitType info_unit_type = 13;
+
+		EventPlayerJoin event_player_join = 20;
+		EventPlayerLeave event_player_leave = 21;
+
+		EventMapGenerate event_map_generate = 30;
+		EventMapGenerateCell event_map_generate_cell = 31;
+		EventGameStart event_game_start = 32;
+		EventPlayerResource event_player_resource = 33;
+
+		EventUnitCreate event_unit_create = 40;
+		EventUnitUpdate event_unit_update = 41;
+		EventUnitDestroy event_unit_destroy = 42;
+
+		EventActionQueued event_action_queued = 50;
+		EventActionUpdate event_action_update = 51;
+		EventActionDequeued event_action_dequeued = 52;
+	}
+}
+
+message Error {
+	required string error = 1;
+}
+
+/* Die Info-Nachrichten schickt der server sofort,
+wenn sich ein neuer Client angemeldet hat. Darin
+sind die verschiedenen Terrain-, Einheiten- und
+Aktionstypen definiert. */
+
+message InfoTerrainType {
+	required uint32 terrain_type_id = 1;
+	required types.TerrainType terrain_type = 2;
+}
+
+message InfoResourceType {
+	required uint32 resource_type_id = 1;
+	required types.ResourceType resource_type = 2;
+}
+
+message InfoActionType {
+	required uint32 action_type_id = 1;
+	required types.ActionType action_type = 2;
+}
+
+message InfoUnitType {
+	required uint32 unit_type_id = 1;
+	required types.UnitType unit_type = 2;
+}
+
+/* Wenn Spieler hinzugefügt/Entfernt werden,
+wird das allen anderen Clients mit diesen Nachrichten
+mitgeteilt. */
+message EventPlayerJoin {
+	required uint32 player_id = 1;
+	required string name = 2;
+}
+
+message EventPlayerLeave {
+	required uint32 player_id = 1;
+}
+
+/* Sobald alle Spieler angemeldet sind, kann einer
+davon ein CmdGameStart schicken, um eine Karte generieren
+zu lassen und das Spiel zu starten.
+ - Client->Server:  CmdGameStart
+ - Server->Clients: EventMapGenerate
+	legt die größe der Karte fest
+ - Server->Clients: EventMapGenerateCell (einmal pro Zelle)
+	legt den Terraintyp jeder Zelle fest
+ - Server->Clients: EventUnitCreate (beliebig oft)
+	teilt den Clients die Starteinheiten mit
+ - Server->Clients: EventGameStart
+	ab diesem Event können Einheiten gesteuert werden
+*/
+message EventMapGenerate {
+	required uint32 width = 1;
+	required uint32 height = 2;
+}
+
+message EventMapGenerateCell {
+	required types.vec2 position = 1;
+	required uint32 terrain_type_id = 2;
+}
+
+message EventGameStart {
+	
+}
+
+message EventPlayerResource {
+	required uint32 resource_type_id = 1;
+	required uint32 amount = 2;
+}
+
+message EventUnitCreate {
+	required uint32 unit_id = 1;
+	required uint32 player_id = 2;
+	required uint32 unit_type_id = 3;
+	required types.vec2 position = 4;
+}
+
+message EventUnitUpdate {
+	required uint32 unit_id = 1;
+	repeated string tags = 2;
+}
+
+message EventUnitMove {
+	required uint32 unit_id = 1;
+	required types.vec2 position = 2;
+}
+
+message EventUnitDestroy {
+	required uint32 unit_id = 1;
+}
+
+enum ActionState {
+	QUEUED = 0; //Die aktion ist in der Warteschlange
+	WORKING = 1; //Die Aktion wird soeben bearbeitet
+	COMPLETE = 2; //Die Aktion wurde vollständig abgearbeitet (ein EventActionDequeued folgt)
+	WAIT = 3; //Die Aktion wartet (e.g. bis genügend Ressourcen vorhanden sind)
+	CANCELLED = 4; //Die Aktion wurde vom Nutzer abgebrochen (ein EventActionDequeued folgt)
+	FAILED = 5; //Die Aktion kann nicht fertiggestellt werden (e.g. Zieleinheit existiert nicht mehr, Feld mittlerweile bebaut, ...) (ein EventActionDequeued folgt)
+};
+
+message EventActionQueued {
+	required uint32 action_id = 1;
+	required uint32 unit_id = 2;
+}
+
+message EventActionUpdate {
+	required uint32 action_id = 1;
+	required ActionState state = 2;
+	optional types.ActionMode mode = 3;
+	optional uint32 duration = 4;
+	optional string message = 5;
+}
+
+message EventActionDequeued {
+	required uint32 action_id = 1;
+}

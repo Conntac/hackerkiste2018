@@ -1,0 +1,72 @@
+syntax = "proto2";
+
+/* Hier sind nützliche typen definiert, die im Protokoll an mehreren
+Stellen verwendet werden. */
+
+package reset.proto.types;
+
+message vec2 {
+	required uint32 x = 1;
+	required uint32 y = 2;
+}
+
+message TerrainType {
+	required string name = 1;
+	optional string description = 2;
+	/* Vordefinierte tags:
+	- build - bebaubar
+	- walk - begehbar
+	- water - wasser (beschiffbar)
+	Weitere tags können nach belieben hinzugefügt werden
+	*/
+	repeated string tags = 3;
+}
+
+message ResourceType {
+	required string name = 1;
+	optional string description = 2;
+}
+
+message UnitType {
+	required string name = 1;
+	optional string description = 2;
+	optional uint32 default_action_type_id = 3;
+	/* Vordefinierte tags:
+	- building - Gebäude (unbeweglich)
+	- resource - Ressourcenvorkommen (abbaubar)
+	- water - Wasser (e.g. Schiff)
+	Weitere tags können nach belieben hinzugefügt werden
+	*/
+	repeated string tags = 4;
+}
+
+enum ActionTargetType {
+	NONE = 0; //Die Aktion benötigt keine Zielauswahl
+	CELL = 1; //Die Aktion erfordert die Auswahl einer freien Kartenzelle als Ziel
+	UNIT = 2; //Die Aktion erfordert die Auswahl einer Einheit als Ziel
+}
+
+enum ActionMode {
+	ONCE = 0; //Die Aktion soll einmal ausgeführt und dann gelöscht werden.
+	REPEAT = 1; //Die Aktion soll, nachdem sie fertiggestellt wurde, gleich nochmal in die Schlange aufgenommen werden.
+}
+
+message ActionType {
+	message ResourceCost {
+		required uint32 resource_type_id = 1;
+		required uint32 amount = 2;
+	}
+	
+	required string name = 1;
+	optional string description = 2;
+	required uint32 unit_type_id = 3;
+
+	repeated ResourceCost cost = 4;
+	required double duration = 5;
+	required ActionMode default_mode = 6 [default = ONCE];
+
+	required ActionTargetType target_type = 7 [default = NONE];
+	/* Wenn target != NONE, kann hier definiert werden welche tags das Ziel haben muss */
+	repeated string target_tags = 8;
+}
+

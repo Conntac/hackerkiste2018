@@ -1,0 +1,48 @@
+syntax = "proto2";
+
+/* Hier sind Befehle definiert, die ein Client
+an den Server senden kann. */
+
+package reset.proto.commands;
+
+import "types.proto";
+
+// Das, was eigentlich an den Server geschickt wird.
+// Enthält genau eine der Nachrichtenarten, die unten definiert sind.
+message ClientToServer {
+	oneof payload {
+		CmdJoin join = 10;
+		CmdLeave leave = 11;
+		CmdGameStart game_start = 20;
+		CmdActionQueue action_queue = 30;
+		CmdActionCancel action_cancel = 31;
+	}
+}
+
+// Verschiedene Nachrichtenarten, die in eine Message gepackt
+// und an den Server geschickt werden können.
+message CmdJoin {
+	required string name = 1;
+}
+
+message CmdLeave {
+
+}
+
+message CmdGameStart {
+	
+}
+
+message CmdActionQueue {
+	required uint32 action_type_id = 1;
+	required uint32 unit_id = 2;
+	optional types.ActionMode mode = 3 [default = ONCE];
+
+	optional uint32 target_unit_id = 4;
+	optional types.vec2 target_cell = 5;
+}
+
+message CmdActionCancel {
+	required uint32 action_id = 1;
+}
+
