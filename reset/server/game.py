@@ -136,9 +136,9 @@ class Unit:
 						await action.action_type.executor(self.map, action)  # Do the work (e.g. deduct resources, delay for duration)
 						await put_state(ActionState.COMPLETE)
 					except ResourceError as err:
-						await put_state(ActionState.WAIT, f"Action {action.id} ({action.action_type.name}) is waiting: {err.msg}")
+						await put_state(ActionState.WAIT, f"Action {action.id} ({action.action_type.name}) is waiting: {err.message}")
 					except ActionError as err:
-						await put_state(err.state, err.msg)
+						await put_state(err.state, err.message)
 					except curio.TaskCancelled:
 						await put_state(ActionState.CANCELLED)
 					except:
