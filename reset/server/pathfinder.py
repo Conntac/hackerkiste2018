@@ -75,6 +75,9 @@ class PathFinder:
 				continue
 			if 'walk' not in self.map[nx, ny].terrain_type.tags:
 				continue
+			unit = self.map[nx, ny].unit
+			if unit is not None and ('resource' in unit.unit_type.tags or 'building' in unit.unit_type.tags):
+			    continue
 			yield (nx, ny)
 
 	def _reconstruct_path(self, start_pos, dest_pos, prev):
