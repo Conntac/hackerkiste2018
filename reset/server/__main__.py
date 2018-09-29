@@ -6,6 +6,7 @@ from . import ProtocolPreGame, Server
 from .rules import *
 from .generator import *
 from .game import Payment
+from .pathfinder import PathFinder
 from .tcp_server import tcp_server
 from .ws_server import ws_server
 
@@ -32,13 +33,21 @@ def action_farm(farm_resources):
 		await action.unit.player.give(farm_resources)
 	return execute
 
-def action_move():
-	pathfinder = Pathfinder()
-	async def execute_move_towards(map, action):
-		pathfinder.update(action.unit, action.target_cell)
+async def execute_move_towards(map, action):
+	pathfinder = PathFinder(map)
+	start_pos = map.get_location(action.unit)
+	steps = pathfinder.plan(start_pos, action.target_cell)
+	for step in steps:
 		await curio.sleep(action.action_type.duration)
-		await map.move_unit(action.unit, pathfinder.get_next_cell())
-	pass
+		timeout = 3
+		while map[step].unit is not None and timeout > 0:
+			await curio.sleep(action.action_type.duration)
+			timeout -= 1
+		if timeout == 0:
+			# give up on finding a path
+			print(map)
+			return
+		await map.move_unit(action.unit, step)
 
 
 unit_forest = rules.unit_types.create("forest", "Forest", {"resource", "resource_wood"})
@@ -46,7 +55,7 @@ unit_quarry = rules.unit_types.create("quarry", "Quarry", {"resource", "resource
 unit_city = rules.unit_types.create("city", "City", {"building"})
 unit_citizen = rules.unit_types.create("citizen", "Citizen", set())
 
-#action_citizen_move_towards = runes.action_types.create(execute_move_towards, "citizen_move_towards", "Move", unit_citizen, duration=0.5, target_type=ActionTargetType.CELL, target_tags={"walk"})
+action_citizen_move_towards = rules.action_types.create(execute_move_towards, "citizen_move_towards", "Move", unit_citizen, duration=0.5, target_type=ActionTargetType.CELL, target_tags={"walk"})
 action_citizen_farm_wood = rules.action_types.create(action_farm({resource_wood: 10}), "citizen_farm_wood", "Cut down trees", unit_citizen, duration=2.0, target_type=ActionTargetType.UNIT, target_tags={"resource_wood"})
 action_city_create_citizen = rules.action_types.create(action_create_near(unit_citizen), "city_create_citizen", "Create a Citizen", unit_city, {resource_food: 20}, 2.0)
 

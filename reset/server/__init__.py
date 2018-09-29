@@ -236,7 +236,7 @@ class ProtocolGame(Protocol):
 				raise game.GameError("This action does not work on cells")
 			if not (0 <= target_cell[0] < self.map.width and 0 <= target_cell[1] < self.map.height):
 				raise game.GameError("Target cell is not inside the map")
-			if not action_type.target_types <= target_cell.tags:
+			if not action_type.target_tags <= self.map[target_cell].terrain_type.tags:
 				raise game.GameError("Target cell does not have the necessary tags")
 
 		action = await self.map.action_queue(action_type, unit, message.mode, target_unit, target_cell)

@@ -28,6 +28,7 @@ message ServerToClient {
 		EventUnitCreate event_unit_create = 40;
 		EventUnitUpdate event_unit_update = 41;
 		EventUnitDestroy event_unit_destroy = 42;
+		EventUnitMove event_unit_move = 43;
 
 		EventActionQueued event_action_queued = 50;
 		EventActionUpdate event_action_update = 51;

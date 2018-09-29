@@ -238,6 +238,20 @@ class Map:
 		await unit.queue_action(action)
 		return action
 
+	async def move_unit(self, unit, destination):
+		cell = self[destination]
+		if 'walk' not in cell.terrain_type.tags:
+			raise GameError("cannot move unit to unwalkable cell")
+		unit_pos = self.get_location(unit)
+		if abs(unit_pos[0] - destination[0]) > 1 or abs(unit_pos[1] - destination[1]) > 1:
+			raise GameError("can only move unit to neighboring cell")
+		if cell.unit is not None:
+			raise GameError("cells can only hold one unit")
+		cell.unit = unit
+		self[unit_pos].unit = None
+		await self.events.put(('UNIT_MOVE', unit, destination))
+
+
 
 def vicinity(xy, width, height):
 	'''Generate coordinates starting at xy and gradually moving further away
