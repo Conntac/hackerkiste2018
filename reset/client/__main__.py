@@ -67,7 +67,7 @@ async def main():
 	protocol = ProtocolUser(rules)
 	client = Client(args.host, args.port, protocol)
 	async with util.ScopeTask(client.run()):
-		cli_task = await curio.spawn(cli(pargs, rules, client))
+		cli_task = await curio.spawn(cli(args, rules, client))
 		if args.join:
 			await command_join(client, [])
 		if args.start:
