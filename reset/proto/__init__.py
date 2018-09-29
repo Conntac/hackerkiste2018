@@ -34,7 +34,7 @@ class Protocol:
 		if hasattr(message, 'DESCRIPTOR'):
 			print(message.DESCRIPTOR.name, google.protobuf.json_format.MessageToJson(message))
 		else:
-			print(message)
+			print("Unhandled:", message)
 
 	@staticmethod
 	def handler(command_type):

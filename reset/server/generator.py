@@ -79,6 +79,7 @@ class Generator:
 		width = height = int(math.sqrt(len(players) * MAP_AREA_PER_PLAYER) + 1)  # this gives each player roughly that much space
 		print(f"Generating map with dimensions {width}x{height}")
 		map = game.Map(players, width, height)
+		await map.events.put(('MAP', map))
 		for pass_ in self._passes:
 			await pass_.generate(map)
 		return map
@@ -87,7 +88,7 @@ class Generator:
 def hook_terrain(terrain_type, min, max):
 	async def hook(map, xy, v):
 		if min <= v < max:
-			map[xy].terrain_type = terrain_type
+			await map.set_terrain(xy, terrain_type)
 	return hook
 
 

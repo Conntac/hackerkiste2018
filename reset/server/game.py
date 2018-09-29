@@ -217,6 +217,10 @@ class Map:
 			if c.unit == unit:
 				return i % self.width, i // self.width
 
+	async def set_terrain(self, xy, terrain_type):
+		self[xy].terrain_type = terrain_type
+		await self.events.put(('MAP_CELL', xy, terrain_type))
+
 	async def create_unit(self, xy, unit_type, player):
 		unit = self.units.create(unit_type, self, player)
 		cell = self[xy]

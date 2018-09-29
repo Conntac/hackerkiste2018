@@ -79,11 +79,11 @@ class ProtocolUser(Protocol):
 
 	@Protocol.handler(events.EventMapGenerate)
 	async def on_map_generate(self, server, client, message):
-		pass
+		print(f"Map is {message.width}x{message.height}")
 
 	@Protocol.handler(events.EventMapGenerateCell)
 	async def on_map_generate_cell(self, server, client, message):
-		pass
+		print(f"Map ({message.position.x}, {message.position.y}) is terrain type {message.terrain_type_id}")
 
 	@Protocol.handler(events.EventGameStart)
 	async def on_game_start(self, server, client, message):

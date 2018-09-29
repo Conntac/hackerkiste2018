@@ -146,21 +146,6 @@ class ProtocolPreGame(Protocol):
 			info.action_type.target_tags[:] = action_type.target_tags
 			await server.broadcast(info)
 
-	async def _send_map(self, server, map):
-		await server.broadcast(events.EventMapGenerate(width=map.width, height=map.height))
-		for xy, cell in map:
-			event = events.EventMapGenerateCell()
-			event.position.x, event.position.y = xy
-			event.terrain_type_id = cell.terrain_type.id
-			await server.broadcast(event)
-			if cell.unit is not None:
-				event = events.EventUnitCreate()
-				event.unit_id = cell.unit.id
-				event.player_id = cell.unit.player.id if cell.unit.player else 0
-				event.unit_type_id = cell.unit.unit_type.id
-				event.position.x, event.position.y = xy
-				await server.broadcast(event)
-
 
 class ProtocolGame(Protocol):
 	def __init__(self, rules, map):
@@ -179,6 +164,19 @@ class ProtocolGame(Protocol):
 			return await super(ProtocolGame, self).handle(server, client, message)
 		except game.GameError as e:
 			await client.send(events.Error(error=e.message))
+
+	@Protocol.handler('MAP')
+	async def on_event_map(self, server, client, event):
+		map, = event
+		event = events.EventMapGenerate(width=map.width, height=map.height)
+		await server.broadcast(event)
+
+	@Protocol.handler('MAP_CELL')
+	async def on_event_map_cell(self, server, client, event):
+		xy, terrain_type = event
+		event = events.EventMapGenerateCell(terrain_type_id=terrain_type.id)
+		event.position.x, event.position.y = xy
+		await server.broadcast(event)
 
 	@Protocol.handler('UNIT_CREATE')
 	async def on_event_unit_create(self, server, client, event):
